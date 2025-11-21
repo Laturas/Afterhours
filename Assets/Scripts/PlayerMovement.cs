@@ -139,10 +139,17 @@ public class PlayerMovement : MonoBehaviour
 
         // Cast character controller shape 10 meters forward to see if it is about to hit anything.
         // if (Physics.CapsuleCast(p1, p2, playerRadius, standPos - transform.position, out hit, (standPos - transform.position).magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) Debug.Log(hit.point);
+        Vector3 movVec = standPos - transform.position;
+
         DEBUG_groundPos.transform.position = standPos;
-        if (Physics.Raycast(transform.position, standPos - transform.position, out hit, (standPos - transform.position).magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
+        if (Physics.Raycast(transform.position, movVec, out hit, movVec.magnitude + playerRadius, 1 << 0, QueryTriggerInteraction.Ignore)) {
             DEBUG_wallPos.transform.position = hit.point;
-            return transform.position;
+            Vector3 moveable = hit.point - transform.position;
+            Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
+
+            Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
+            moveableWithShellOffset += remainingProj;
+            return transform.position + moveableWithShellOffset;
         }
         return ground + Vector3.up * 1f;
     }
