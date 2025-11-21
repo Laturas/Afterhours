@@ -9,12 +9,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c98821ae6ee9a7744b4df7d3166aa81b, type: 3}
+  m_Script: {fileID: 11500000, guid: fcb6d97510908ceb3ae161667d888b87, type: 3}
   m_Name: PlayerParams
   m_EditorClassIdentifier: 
-  defaultCameraHeight: 5
+  defaultCameraHeight: 8.6
   defaultCameraDistance: 10
   defaultCameraRotAngle: 225
-  defaultCameraLerpSpeed: 0.01
-  playerSpeed: 8
-  playerAcceleration: 0
+  defaultCameraLerpSpeed: 1
+  playerSpeed: 10
+  playerAcceleration: 5
+  playerStepUpHeight: 0.4
+  playerStepDownHeight: 0.4

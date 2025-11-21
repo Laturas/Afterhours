@@ -12,7 +12,7 @@ public class PlayerCamera : MonoBehaviour
     private Transform lookAt => (alternateLookAt == null) ? defaultLookAt : alternateLookAt;
     private PlayerParams parameters => ScriptableObjects.instance.playerParams;
 
-    void Update()
+    public void PlayerCameraUpdate()
     {
         moveTo.transform.position = player.transform.position + Vector3.up * parameters.defaultCameraHeight;
         Quaternion rotation = Quaternion.AngleAxis(parameters.defaultCameraRotAngle, Vector3.up);

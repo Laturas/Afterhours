@@ -12,6 +12,8 @@ public class PlayerParams : ScriptableObject
     [Header("Player Movement")]
     public float playerSpeed;
     public float playerAcceleration;
+    public float playerStepUpHeight;
+    public float playerStepDownHeight;
 
 
 
