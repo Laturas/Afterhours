@@ -121,7 +121,7 @@ public class PlayerMovement : MonoBehaviour
     }
 
     Vector3 resolveWalls(Vector3 ground) {
-        assert(ground != Vector3.zero);
+        // assert(ground != Vector3.zero);
         if (ground == Vector3.zero) {
             return transform.position;
         }
@@ -142,17 +142,53 @@ public class PlayerMovement : MonoBehaviour
         Vector3 movVec = standPos - transform.position;
 
         DEBUG_groundPos.transform.position = standPos;
-        if (Physics.Raycast(transform.position, movVec, out hit, movVec.magnitude + playerRadius, 1 << 0, QueryTriggerInteraction.Ignore)) {
+        Vector3 first_pos = transform.position + new Vector3(0,parameters.playerStepUpHeight - playerRadius,0);
+        Vector3 second_pos = transform.position + new Vector3(0,playerRadius,0);
+        // 
+        if (Physics.CapsuleCast(first_pos, second_pos, playerRadius, movVec.normalized, out hit, movVec.magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
             DEBUG_wallPos.transform.position = hit.point;
-            Vector3 moveable = hit.point - transform.position;
-            Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
+            Vector3 moveable = movVec.normalized * (hit.distance - 0.01f);
+            // Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
 
             Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
-            moveableWithShellOffset += remainingProj;
-            return transform.position + moveableWithShellOffset;
+            moveable += remainingProj;
+            return transform.position + moveable;
         }
         return ground + Vector3.up * 1f;
     }
+    // Vector3 resolveWalls(Vector3 ground) {
+    //     // assert(ground != Vector3.zero);
+    //     if (ground == Vector3.zero) {
+    //         return transform.position;
+    //     }
+    //     Vector3 effectiveStand = Vector3.up * parameters.playerStepUpHeight;
+    //     // Vector3 capsuleCastFrom = transform.position + effectiveStand;
+    //     // Vector3 capsuleCastTo = standPos + Vector3.up * 1f + effectiveStand;
+    //     RaycastHit hit;
+    //     float playerRadius = 0.5f;
+    //     float playerHeight = 1f;
+    //     Vector3 standPos = ground + new Vector3(0,playerHeight,0);
+    //     // Player's center offset to the stepUpHeight
+    //     // Vector3 p1 = transform.position + (Vector3.up * -playerHeight/2 * playerRadius) + effectiveStand;
+    //     // Vector3 p2 = p1 + Vector3.up * playerHeight;
+    //     // Debug.Log("p1: " + p1 + "p2: " + p2);
+
+    //     // Cast character controller shape 10 meters forward to see if it is about to hit anything.
+    //     // if (Physics.CapsuleCast(p1, p2, playerRadius, standPos - transform.position, out hit, (standPos - transform.position).magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) Debug.Log(hit.point);
+    //     Vector3 movVec = standPos - transform.position;
+
+    //     DEBUG_groundPos.transform.position = standPos;
+    //     if (Physics.Raycast(transform.position, movVec, out hit, movVec.magnitude + playerRadius, 1 << 0, QueryTriggerInteraction.Ignore)) {
+    //         DEBUG_wallPos.transform.position = hit.point;
+    //         Vector3 moveable = hit.point - transform.position;
+    //         Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
+
+    //         Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
+    //         moveableWithShellOffset += remainingProj;
+    //         return transform.position + moveableWithShellOffset;
+    //     }
+    //     return ground + Vector3.up * 1f;
+    // }
 
     void movePlayerSweep(Vector3 inputDirection) {
         Vector3 movementVec = computeMovementVector(inputDirection);
