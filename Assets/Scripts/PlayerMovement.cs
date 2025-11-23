@@ -102,19 +102,68 @@ public class PlayerMovement : MonoBehaviour
         return inputDirection.normalized * parameters.playerSpeed * Time.deltaTime;
     }
 
+    bool tryGetGroundInDirection(Vector3 testFrom, out RaycastHit hit) {
+        RaycastHit outHit = new RaycastHit();
+        Vector3 diff = new Vector3(testFrom.x - transform.position.x, 0, testFrom.z - transform.position.z);
+        for (int i = 0; i < 3; i++) {
+            if (Physics.Raycast(testFrom, Vector3.down, out outHit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0)) {
+                hit = outHit;
+                return true;
+            } else {
+                testFrom = new Vector3(transform.position.x + diff.x / 2, testFrom.y, transform.position.z + diff.z / 2);
+            }
+        }
+        hit = outHit;
+        return false;
+    }
+
     /// Starts from the player's step up height, raycasts down until the step-down height to find the first valid position.
     /// Returns Vector3.zero on failure.
     /// 
     /// TODO: Capsulecast better?
     Vector3 resolveGround(Vector3 movementVec) {
-        Vector3 testFrom = new Vector3(movementVec.x, movementVec.y - 1f + parameters.playerStepUpHeight, movementVec.z);
+        Vector3 testFrom1 = new Vector3(transform.position.x, movementVec.y - 1f + parameters.playerStepUpHeight, movementVec.z);
+        Vector3 testFrom2 = new Vector3(movementVec.x, movementVec.y - 1f + parameters.playerStepUpHeight, transform.position.z);
         RaycastHit hit;
-        if (!Physics.Raycast(testFrom, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0)) {
-            return Vector3.zero; // TODO: Binary search
+        Vector3 ground = Vector3.zero;
+        bool found = false;
+        // TODO: Binary search
+        if (tryGetGroundInDirection(testFrom1, out hit)) {
+            ground = hit.point;
+            found = true;
         }
-        Vector3 ground = hit.point;
+        if (tryGetGroundInDirection(testFrom2, out hit)) {
+            ground.x = hit.point.x;
+            if (!found) {
+                ground = hit.point;
+            } else {
+                ground.y = (hit.point.y >= ground.y) ? hit.point.y : ground.y;
+            }
+        }
         return ground;
     }
+
+    // Vector3 resolveGround(Vector3 movementVec) {
+    //     Vector3 testFrom1 = new Vector3(transform.position.x, movementVec.y - 1f + parameters.playerStepUpHeight, movementVec.z);
+    //     Vector3 testFrom2 = new Vector3(movementVec.x, movementVec.y - 1f + parameters.playerStepUpHeight, transform.position.z);
+    //     RaycastHit hit;
+    //     Vector3 ground = Vector3.zero;
+    //     bool found = false;
+    //     // TODO: Binary search
+    //     if (Physics.CapsuleCast(testFrom1, testFrom1 + new Vector3(0, playerHeight, 0f), 0.1f, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0, QueryTriggerInteraction.Ignore)) {
+    //         ground = hit.point;
+    //         found = true;
+    //     }
+    //     if (Physics.CapsuleCast(testFrom2, testFrom2 + new Vector3(0, playerHeight, 0f), 0.1f, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0, QueryTriggerInteraction.Ignore)) {
+    //         ground.x = hit.point.x;
+    //         if (!found) {
+    //             ground = hit.point;
+    //         } else {
+    //             ground.y = (hit.point.y >= ground.y) ? hit.point.y : ground.y;
+    //         }
+    //     }
+    //     return ground;
+    // }
 
     void assert(bool boolean) {
         if (!boolean) Debug.LogError("Assertion failed");
@@ -151,7 +200,16 @@ public class PlayerMovement : MonoBehaviour
             // Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
 
             Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
-            moveable += remainingProj;
+            if (!Physics.CapsuleCast(first_pos, second_pos, playerRadius, remainingProj.normalized, out hit, remainingProj.magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
+                DEBUG_wallPos.transform.position = hit.point;
+
+                moveable += remainingProj;
+            } else
+            {
+                Vector3 extraMoveable = remainingProj.normalized * (hit.distance - 0.01f);
+                moveable += extraMoveable;
+            }
+
             return transform.position + moveable;
         }
         return ground + Vector3.up * 1f;
