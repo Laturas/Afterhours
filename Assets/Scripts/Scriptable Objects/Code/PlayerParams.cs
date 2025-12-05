@@ -14,6 +14,11 @@ public class PlayerParams : ScriptableObject
     public float playerAcceleration;
     public float playerStepUpHeight;
     public float playerStepDownHeight;
+    public float wallFloorAngleBarrier;
+    public int playerDashSampleDensity;
+    public float playerDashDistance;
+    public LayerMask playerMovementColliders;
+    public LayerMask playerDashingColliders;
 
 
 

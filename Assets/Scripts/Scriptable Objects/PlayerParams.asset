@@ -20,3 +20,12 @@ MonoBehaviour:
   playerAcceleration: 5
   playerStepUpHeight: 0.4
   playerStepDownHeight: 0.4
+  wallFloorAngleBarrier: 43.9
+  playerDashSampleDensity: 8
+  playerDashDistance: 2
+  playerMovementColliders:
+    serializedVersion: 2
+    m_Bits: 1
+  playerDashingColliders:
+    serializedVersion: 2
+    m_Bits: 1

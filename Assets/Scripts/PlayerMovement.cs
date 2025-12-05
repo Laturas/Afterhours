@@ -6,96 +6,19 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] Vector3 velocityVector;
     [SerializeField] Vector3 pos;
     [SerializeField] Transform DEBUG_groundPos;
-    [SerializeField] Transform DEBUG_wishPos;
     [SerializeField] Transform DEBUG_wallPos;
     [SerializeField] PlayerCamera pcam;
     private Rigidbody rb;
-    float playerHeight = 1.0f;
-    // [SerializeField] Collider feetCollider;
-
-    /// Step 1: Project along the ground
-    /// 
-    ///             .__ Max step up height
-    ///             |
-    /// Player ---->|___ new floor
-    /// _____floor  |
-    ///             V Max step down height
-    /// 
-    /// Step 2: Raycast for colliders (wall detection)
-    /// Step 3: Stop the player short at the nearest wall/pit
-    // void movePlayer(Vector3 inputDirection)
-    // {
-    //     pos = transform.position;
-    //     // Step 1.
-    //     // TODO: Implement a real velocity system
-    //     velocityVector = inputDirection.normalized * Time.deltaTime * parameters.playerSpeed;
-    //     RaycastHit hit;
-    //     if (!Physics.Raycast(pos, Vector3.down, out hit, 1f, 1 << 0)) {
-    //         return;
-    //     }
-    //     Vector3 ground = hit.point;
-    //     DEBUG_groundPos.position = ground;
-
-    //     Vector3 stepCheckerOrigin = ground + velocityVector + (Vector3.up * parameters.playerStepUpHeight);
-    //     Vector3 wishPosition = pos;
-    //     // Does the ray intersect any objects excluding the player layer
-    //     if (Physics.Raycast(stepCheckerOrigin, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0)) {
-    //         Debug.DrawRay(stepCheckerOrigin, hit.point - stepCheckerOrigin, Color.green); 
-    //         wishPosition = hit.point + (Vector3.up * 1f);
-    //     }
-    //     Vector3 checkFrom = ground + (Vector3.up * parameters.playerStepUpHeight); // Checkfrom distance
-    //     Vector3 checkFromShell = checkFrom + (checkFrom.normalized * 0.5f); // Now we need to cast it out from the shell of the player
-    //     Vector3 movementVec = checkFromShell - wishPosition; 
-
-    //     Debug.DrawRay(checkFrom, movementVec, Color.red);
-    //     // Shoot a raycast from the player hitbox edge outward in the direction of the movemen
-    //     if (Physics.Raycast(checkFrom, movementVec, out hit, movementVec.magnitude, 1 << 0)) {
-    //         wishPosition = (movementVec.normalized * 0.5f) - hit.point;
-    //     }
-    //     Debug.DrawRay(checkFrom, wishPosition - transform.position, Color.blue); 
-    //     transform.position = wishPosition;
-    // }
+    private CapsuleCollider playerCollider;
+    private float playerHeight => (playerCollider != null) ? playerCollider.height : 2f;
+    private float playerRadius => (playerCollider != null) ? playerCollider.radius : 0.5f;
 
     Vector3 getGroundNormal() {
         RaycastHit hit;
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 1.01f, 1 << 0)) {
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 1.01f, parameters.playerMovementColliders)) {
             return hit.normal;
         }
         return Vector3.up;
-    }
-
-    [SerializeField] RaycastHit[] results = new RaycastHit[25];
-    void movePlayerPhysicsBased(Vector3 inputDirection) {
-        Vector3 normal = getGroundNormal();
-
-        Vector3 projVec = Vector3.ProjectOnPlane(inputDirection, normal).normalized;
-
-        // Vector3 capsuleCastOrigin = transform.position + (transform.up * parameters.playerStepUpHeight);
-        Vector3 velVec = parameters.playerSpeed * inputDirection * Time.deltaTime; // Velocity needs to be scaled to account for framerate.
-        // Vector3 stopAtPosition = velVec;
-        // RaycastHit hit;
-        // if (Physics.CapsuleCast(transform.position + transform.up * playerHeight, transform.position - (-transform.up * parameters.playerStepUpHeight), 0.5f, projVec, velVec.magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
-        //     // (hit.point - velVec * 0.5f);
-        //     Vector3 projected = Vector3.Project(hit.point - transform.position, (velVec - transform.position).normalized);
-        //     stopAtPosition = (projected - (0.5f * projected.normalized)) + transform.position; // Account for radius
-        // }
-        // transform.position = stopAtPosition;
-
-        // RaycastHit hit; Physics.CapsuleCast();
-
-
-        // Debug.DrawRay(transform.position, velVec, Color.blue); 
-        rb.linearVelocity = velVec;
-        // Vector3 currentVelocity = rb.linearVelocity;
-        // Vector3 velocityChange = velVec - currentVelocity;
-
-        // rb.AddForce(velocityChange * parameters.playerAcceleration, ForceMode.Acceleration);
-        // Debug.DrawRay(Vector3.up + transform.position, velVec, Color.blue); 
-
-        // int colliderCount = Physics.CapsuleCastNonAlloc(Vector3.up + transform.position, transform.position - Vector3.down, 0.5f, inputDirection, results, parameters.playerSpeed, 1 << 0, QueryTriggerInteraction.Ignore); 
-        // for (int i = 0; i < colliderCount; i++) {
-
-        // }
     }
 
     Vector3 computeMovementVector(Vector3 inputDirection) {
@@ -106,7 +29,8 @@ public class PlayerMovement : MonoBehaviour
         RaycastHit outHit = new RaycastHit();
         Vector3 diff = new Vector3(testFrom.x - transform.position.x, 0, testFrom.z - transform.position.z);
         for (int i = 0; i < 3; i++) {
-            if (Physics.Raycast(testFrom, Vector3.down, out outHit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0)) {
+            if (Physics.Raycast(testFrom, Vector3.down, out outHit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, parameters.playerMovementColliders) 
+                && (Vector3.Angle(outHit.normal, Vector3.up) < parameters.wallFloorAngleBarrier)) {
                 hit = outHit;
                 return true;
             } else {
@@ -119,15 +43,12 @@ public class PlayerMovement : MonoBehaviour
 
     /// Starts from the player's step up height, raycasts down until the step-down height to find the first valid position.
     /// Returns Vector3.zero on failure.
-    /// 
-    /// TODO: Capsulecast better?
     Vector3 resolveGround(Vector3 movementVec) {
         Vector3 testFrom1 = new Vector3(transform.position.x, movementVec.y - 1f + parameters.playerStepUpHeight, movementVec.z);
         Vector3 testFrom2 = new Vector3(movementVec.x, movementVec.y - 1f + parameters.playerStepUpHeight, transform.position.z);
         RaycastHit hit;
         Vector3 ground = Vector3.zero;
         bool found = false;
-        // TODO: Binary search
         if (tryGetGroundInDirection(testFrom1, out hit)) {
             ground = hit.point;
             found = true;
@@ -143,64 +64,26 @@ public class PlayerMovement : MonoBehaviour
         return ground;
     }
 
-    // Vector3 resolveGround(Vector3 movementVec) {
-    //     Vector3 testFrom1 = new Vector3(transform.position.x, movementVec.y - 1f + parameters.playerStepUpHeight, movementVec.z);
-    //     Vector3 testFrom2 = new Vector3(movementVec.x, movementVec.y - 1f + parameters.playerStepUpHeight, transform.position.z);
-    //     RaycastHit hit;
-    //     Vector3 ground = Vector3.zero;
-    //     bool found = false;
-    //     // TODO: Binary search
-    //     if (Physics.CapsuleCast(testFrom1, testFrom1 + new Vector3(0, playerHeight, 0f), 0.1f, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0, QueryTriggerInteraction.Ignore)) {
-    //         ground = hit.point;
-    //         found = true;
-    //     }
-    //     if (Physics.CapsuleCast(testFrom2, testFrom2 + new Vector3(0, playerHeight, 0f), 0.1f, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, 1 << 0, QueryTriggerInteraction.Ignore)) {
-    //         ground.x = hit.point.x;
-    //         if (!found) {
-    //             ground = hit.point;
-    //         } else {
-    //             ground.y = (hit.point.y >= ground.y) ? hit.point.y : ground.y;
-    //         }
-    //     }
-    //     return ground;
-    // }
-
-    void assert(bool boolean) {
-        if (!boolean) Debug.LogError("Assertion failed");
-    }
-
     Vector3 resolveWalls(Vector3 ground) {
         // assert(ground != Vector3.zero);
         if (ground == Vector3.zero) {
             return transform.position;
         }
         Vector3 effectiveStand = Vector3.up * parameters.playerStepUpHeight;
-        // Vector3 capsuleCastFrom = transform.position + effectiveStand;
-        // Vector3 capsuleCastTo = standPos + Vector3.up * 1f + effectiveStand;
         RaycastHit hit;
-        float playerRadius = 0.5f;
-        float playerHeight = 1f;
-        Vector3 standPos = ground + new Vector3(0,playerHeight,0);
-        // Player's center offset to the stepUpHeight
-        // Vector3 p1 = transform.position + (Vector3.up * -playerHeight/2 * playerRadius) + effectiveStand;
-        // Vector3 p2 = p1 + Vector3.up * playerHeight;
-        // Debug.Log("p1: " + p1 + "p2: " + p2);
-
-        // Cast character controller shape 10 meters forward to see if it is about to hit anything.
-        // if (Physics.CapsuleCast(p1, p2, playerRadius, standPos - transform.position, out hit, (standPos - transform.position).magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) Debug.Log(hit.point);
+        Vector3 standPos = ground + new Vector3(0, playerHeight / 2 ,0);
         Vector3 movVec = standPos - transform.position;
 
         DEBUG_groundPos.transform.position = standPos;
         Vector3 first_pos = transform.position + new Vector3(0,parameters.playerStepUpHeight - playerRadius,0);
         Vector3 second_pos = transform.position + new Vector3(0,playerRadius,0);
-        // 
-        if (Physics.CapsuleCast(first_pos, second_pos, playerRadius, movVec.normalized, out hit, movVec.magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
+
+        if (Physics.CapsuleCast(first_pos, second_pos, playerRadius, movVec.normalized, out hit, movVec.magnitude, parameters.playerMovementColliders, QueryTriggerInteraction.Ignore)) {
             DEBUG_wallPos.transform.position = hit.point;
             Vector3 moveable = movVec.normalized * (hit.distance - 0.01f);
-            // Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
 
             Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
-            if (!Physics.CapsuleCast(first_pos, second_pos, playerRadius, remainingProj.normalized, out hit, remainingProj.magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) {
+            if (!Physics.CapsuleCast(first_pos, second_pos, playerRadius, remainingProj.normalized, out hit, remainingProj.magnitude, parameters.playerMovementColliders, QueryTriggerInteraction.Ignore)) {
                 DEBUG_wallPos.transform.position = hit.point;
 
                 moveable += remainingProj;
@@ -214,39 +97,24 @@ public class PlayerMovement : MonoBehaviour
         }
         return ground + Vector3.up * 1f;
     }
-    // Vector3 resolveWalls(Vector3 ground) {
-    //     // assert(ground != Vector3.zero);
-    //     if (ground == Vector3.zero) {
-    //         return transform.position;
-    //     }
-    //     Vector3 effectiveStand = Vector3.up * parameters.playerStepUpHeight;
-    //     // Vector3 capsuleCastFrom = transform.position + effectiveStand;
-    //     // Vector3 capsuleCastTo = standPos + Vector3.up * 1f + effectiveStand;
-    //     RaycastHit hit;
-    //     float playerRadius = 0.5f;
-    //     float playerHeight = 1f;
-    //     Vector3 standPos = ground + new Vector3(0,playerHeight,0);
-    //     // Player's center offset to the stepUpHeight
-    //     // Vector3 p1 = transform.position + (Vector3.up * -playerHeight/2 * playerRadius) + effectiveStand;
-    //     // Vector3 p2 = p1 + Vector3.up * playerHeight;
-    //     // Debug.Log("p1: " + p1 + "p2: " + p2);
 
-    //     // Cast character controller shape 10 meters forward to see if it is about to hit anything.
-    //     // if (Physics.CapsuleCast(p1, p2, playerRadius, standPos - transform.position, out hit, (standPos - transform.position).magnitude, 1 << 0, QueryTriggerInteraction.Ignore)) Debug.Log(hit.point);
-    //     Vector3 movVec = standPos - transform.position;
+    Vector3 resolveWallsDash(Vector3 ground) {
+        Vector3 effectiveStand = Vector3.up * parameters.playerStepUpHeight;
+        RaycastHit hit;
+        Vector3 standPos = ground + new Vector3(0, playerHeight / 2, 0);
+        Vector3 movVec = standPos - transform.position;
 
-    //     DEBUG_groundPos.transform.position = standPos;
-    //     if (Physics.Raycast(transform.position, movVec, out hit, movVec.magnitude + playerRadius, 1 << 0, QueryTriggerInteraction.Ignore)) {
-    //         DEBUG_wallPos.transform.position = hit.point;
-    //         Vector3 moveable = hit.point - transform.position;
-    //         Vector3 moveableWithShellOffset = (moveable - (moveable.normalized * playerRadius));
+        DEBUG_groundPos.transform.position = standPos;
+        Vector3 first_pos = transform.position + new Vector3(0,parameters.playerStepUpHeight - playerRadius,0);
+        Vector3 second_pos = transform.position + new Vector3(0,playerRadius,0);
+        if (Physics.CapsuleCast(first_pos, second_pos, playerRadius, movVec.normalized, out hit, movVec.magnitude, parameters.playerDashingColliders, QueryTriggerInteraction.Ignore)) {
+            DEBUG_wallPos.transform.position = hit.point;
+            Vector3 moveable = movVec.normalized * (hit.distance - 0.01f);
 
-    //         Vector3 remainingProj = Vector3.ProjectOnPlane(movVec, hit.normal);
-    //         moveableWithShellOffset += remainingProj;
-    //         return transform.position + moveableWithShellOffset;
-    //     }
-    //     return ground + Vector3.up * 1f;
-    // }
+            return transform.position + moveable;
+        }
+        return ground + Vector3.up * 1f;
+    }
 
     void movePlayerSweep(Vector3 inputDirection) {
         Vector3 movementVec = computeMovementVector(inputDirection);
@@ -256,6 +124,36 @@ public class PlayerMovement : MonoBehaviour
         transform.position = pos;
     }
 
+
+    void SpaceBoost(Vector3 direction) {
+        Vector3 movVec = direction.normalized * parameters.playerDashDistance;
+        int appliedSamples = parameters.playerDashSampleDensity;
+        for (; appliedSamples > 0; appliedSamples--) {
+            Vector3 testFrom = transform.position + movVec;
+            testFrom.y += parameters.playerStepUpHeight - (playerHeight / 2);
+            RaycastHit hit;
+            if (Physics.Raycast(testFrom, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, parameters.playerDashingColliders)
+                && (Vector3.Angle(hit.normal, Vector3.up) < parameters.wallFloorAngleBarrier)) {
+                transform.position = resolveWallsDash(hit.point);
+                break;
+            }
+            movVec -= direction.normalized * parameters.playerDashDistance / parameters.playerDashSampleDensity;
+        }
+        for (; appliedSamples < parameters.playerDashSampleDensity; appliedSamples++) {
+            Vector3 testFrom = transform.position + (direction.normalized * parameters.playerDashDistance / parameters.playerDashSampleDensity);
+            testFrom.y += parameters.playerStepUpHeight - (playerHeight / 2);
+            RaycastHit hit;
+            if (Physics.Raycast(testFrom, Vector3.down, out hit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, parameters.playerDashingColliders)
+                && (Vector3.Angle(hit.normal, Vector3.up) < parameters.wallFloorAngleBarrier)) {
+                transform.position = resolveWallsDash(hit.point);
+            } else
+            {
+                return;
+            }
+        }
+    }
+
+    private Vector3 currentFacingDirection;
     void Update()
     {
         Vector3 mov = Vector3.zero;
@@ -275,13 +173,19 @@ public class PlayerMovement : MonoBehaviour
         {
             mov += new Vector3(1f, 0f, -1f);
         }
-        // transform.position += mov.normalized * Time.deltaTime * parameters.playerSpeed;
-        movePlayerSweep(mov);
+        currentFacingDirection = (mov == Vector3.zero) ? currentFacingDirection : mov;
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            SpaceBoost(currentFacingDirection);
+        } else {
+            movePlayerSweep(mov);
+        }
         pcam.PlayerCameraUpdate();
+        transform.rotation = Quaternion.LookRotation(currentFacingDirection);
     }
     
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        playerCollider = GetComponent<CapsuleCollider>();
     }
 }
