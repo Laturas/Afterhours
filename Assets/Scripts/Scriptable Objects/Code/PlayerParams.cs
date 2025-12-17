@@ -20,6 +20,11 @@ public class PlayerParams : ScriptableObject
     public LayerMask playerMovementColliders;
     public LayerMask playerDashingColliders;
 
+    [Header("Player Fighting")]
+    public LayerMask targetableColliders;
+    public float lockOnDistance;
+    public int maxLockOnTargets;
+
 
 
 }

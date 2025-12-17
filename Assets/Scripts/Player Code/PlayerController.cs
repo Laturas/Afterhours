@@ -1,13 +1,15 @@
 using UnityEngine;
 
-public class PlayerMovement : MonoBehaviour
+public class PlayerController : MonoBehaviour
 {
+    [SerializeField] PlayerCamera pcam;
     private PlayerParams parameters => ScriptableObjects.instance.playerParams;
+
+#region movementCode
     [SerializeField] Vector3 velocityVector;
     [SerializeField] Vector3 pos;
-    [SerializeField] Transform DEBUG_groundPos;
-    [SerializeField] Transform DEBUG_wallPos;
-    [SerializeField] PlayerCamera pcam;
+    // [SerializeField] Transform DEBUG_groundPos;
+    // [SerializeField] Transform DEBUG_wallPos;
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
     private float playerHeight => (playerCollider != null) ? playerCollider.height : 2f;
@@ -25,19 +27,20 @@ public class PlayerMovement : MonoBehaviour
         return inputDirection.normalized * parameters.playerSpeed * Time.deltaTime;
     }
 
+    RaycastHit groundRaycastHit;
+
     bool tryGetGroundInDirection(Vector3 testFrom, out RaycastHit hit) {
-        RaycastHit outHit = new RaycastHit();
         Vector3 diff = new Vector3(testFrom.x - transform.position.x, 0, testFrom.z - transform.position.z);
         for (int i = 0; i < 3; i++) {
-            if (Physics.Raycast(testFrom, Vector3.down, out outHit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, parameters.playerMovementColliders) 
-                && (Vector3.Angle(outHit.normal, Vector3.up) < parameters.wallFloorAngleBarrier)) {
-                hit = outHit;
+            if (Physics.Raycast(testFrom, Vector3.down, out groundRaycastHit, parameters.playerStepUpHeight + parameters.playerStepDownHeight, parameters.playerMovementColliders) 
+                && (Vector3.Angle(groundRaycastHit.normal, Vector3.up) < parameters.wallFloorAngleBarrier)) {
+                hit = groundRaycastHit;
                 return true;
             } else {
                 testFrom = new Vector3(transform.position.x + diff.x / 2, testFrom.y, transform.position.z + diff.z / 2);
             }
         }
-        hit = outHit;
+        hit = groundRaycastHit;
         return false;
     }
 
@@ -154,23 +157,19 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private Vector3 currentFacingDirection;
-    void Update()
-    {
+
+    Quaternion movementUpdate() {
         Vector3 mov = Vector3.zero;
-        if (Input.GetKey(KeyCode.W))
-        {
+        if (Input.GetKey(KeyCode.W)) {
             mov += new Vector3(1f, 0f, 1f);
         }
-        if (Input.GetKey(KeyCode.A))
-        {
+        if (Input.GetKey(KeyCode.A)) {
             mov += new Vector3(-1f, 0f, 1f);
         }
-        if (Input.GetKey(KeyCode.S))
-        {
+        if (Input.GetKey(KeyCode.S)) {
             mov += new Vector3(-1f, 0f, -1f);
         }
-        if (Input.GetKey(KeyCode.D))
-        {
+        if (Input.GetKey(KeyCode.D)) {
             mov += new Vector3(1f, 0f, -1f);
         }
         currentFacingDirection = (mov == Vector3.zero) ? currentFacingDirection : mov;
@@ -179,13 +178,66 @@ public class PlayerMovement : MonoBehaviour
         } else {
             movePlayerSweep(mov);
         }
+        return Quaternion.LookRotation(currentFacingDirection);
+    }
+#endregion
+
+#region attacking
+
+    private Animator playerAnimator;
+    private Transform lockOn;
+    private Transform[] lockOnTargetList;
+    // This allows for usage of nonalloc.
+    private RaycastHit[] lockOnTargetRHitList;
+
+    void getTarget() {
+        int hitCount = Physics.SphereCastNonAlloc(transform.position, parameters.lockOnDistance, transform.forward, lockOnTargetRHitList, 0f, parameters.targetableColliders, QueryTriggerInteraction.Ignore);
+        private Vector3 distanceToTarget = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+        if (lockOn != null && (lockOn - transform.position).magnitude > parameters.lockOnDistance) {
+            lockOn = null;
+        }
+
+        for (int i = 0; i < hitCount; i++) {
+            RaycastHit hit = lockOnTargetRHitList[i];
+            lockOnTargetList[i] = hit.collider.transform;
+        }
+    }
+
+    void attackUpdate() {
+        getTarget();
+        if (Input.GetMouseButtonDown(0)) {
+            playerAnimator.Play("Attack");
+        }
+    }
+
+#endregion
+
+    /**
+    * Updates the player's "world rotation".
+    * The world rotation is anything visible to the user. Which direction they are facing
+    */
+    void worldRotationUpdate() {
+        if (lockOn != null) {
+            
+        }
+        else {
+            transform.rotation = Quaternion.LookRotation(currentFacingDirection);
+        }
+    }
+
+    public void Update() {
+        movementUpdate();
+        attackUpdate();
+        worldRotationUpdate();
         pcam.PlayerCameraUpdate();
-        transform.rotation = Quaternion.LookRotation(currentFacingDirection);
     }
     
-    void Start()
-    {
+    public void Start() {
+        playerAnimator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
+        lockOnTargetList = new Transform[parameters.maxLockOnTargets];
+        lockOnTargetRHitList = new RaycastHit[parameters.maxLockOnTargets];
+        RaycastHit groundRaycastHit = new RaycastHit();
     }
 }
